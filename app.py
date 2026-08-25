@@ -3,6 +3,7 @@ import yt_dlp
 import os
 import glob
 import tempfile
+import requests
 
 # ১. পেজ সেটআপ
 st.set_page_config(
@@ -87,7 +88,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ৩. কুকিজ হ্যান্ডলিং (Streamlit Secrets অথবা cookies.txt থেকে)
+# ৩. কুকিজ হ্যান্ডলিং
 cookie_path = None
 if "YOUTUBE_COOKIES" in st.secrets:
     temp_cookie = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8')
@@ -97,7 +98,7 @@ if "YOUTUBE_COOKIES" in st.secrets:
 elif os.path.exists("cookies.txt"):
     cookie_path = "cookies.txt"
 
-# ৪. মাল্টি-ল্যাঙ্গুয়েজ টেক্সট
+# ৪. ল্যাঙ্গুয়েজ টেক্সট
 TEXTS = {
     "bn": {
         "title": "🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার",
@@ -151,7 +152,7 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# 🟢 ইউটিউব ডিটেকশন ও ক্লায়েন্ট বাইপাস কনফিগারেশন
+# 🟢 বাইপাস কনফিগারেশন (উইথ ফলব্যাক)
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
@@ -159,14 +160,13 @@ COMMON_YDL_OPTS = {
     'noplaylist': True,
     'ignoreerrors': True,
     'geo_bypass': True,
+    'socket_timeout': 10,
     'http_headers': {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
     },
     'extractor_args': {
         'youtube': {
-            'player_client': ['android', 'ios'],
+            'player_client': ['ios', 'android', 'web_creator'],
             'player_skip': ['webpage', 'configs'],
         }
     }
@@ -181,17 +181,35 @@ if st.button(t["fetch_btn"]):
         st.warning(t["err_empty"])
     else:
         with st.spinner(t["fetching"]):
+            clean_url = url.split("?si=")[0].split("&si=")[0]
+            fetched = False
+            
+            # পদ্ধতি ১: yt-dlp প্রাইমারি ড্রাইভার
             try:
-                # লিঙ্ক ক্লিন-আপ
-                clean_url = url.split("?si=")[0].split("&si=")[0]
-                
                 ydl_opts = COMMON_YDL_OPTS.copy()
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(clean_url, download=False)
-                    st.session_state.video_info = info
+                    if info:
+                        st.session_state.video_info = info
+                        st.session_state.video_url = url
+                        fetched = True
+            except Exception:
+                pass
+
+            # পদ্ধতি ২: কাস্টম API ফলব্যাক (yt-dlp ব্লক হলে অটোমেটিক ট্রাই হবে)
+            if not fetched:
+                try:
+                    oembed_url = f"https://www.youtube.com/oembed?url={clean_url}&format=json"
+                    res = requests.get(oembed_url, timeout=5).json()
+                    st.session_state.video_info = {
+                        'title': res.get('title', 'YouTube Video'),
+                        'thumbnail': res.get('thumbnail_url'),
+                        'formats': []
+                    }
                     st.session_state.video_url = url
-            except Exception as e:
-                st.error(f"{t['err_fetch']} {str(e)}")
+                    fetched = True
+                except Exception as e:
+                    st.error(f"{t['err_fetch']} {str(e)}")
 
 # ৬. রেজোলিউশন ও ডাউনলোড হ্যান্ডলিং
 if st.session_state.video_info and st.session_state.video_url == url:
@@ -205,7 +223,7 @@ if st.session_state.video_info and st.session_state.video_url == url:
         st.image(thumbnail, width="stretch")
 
     formats = info.get('formats', [])
-    options = {"Audio Only (MP3)": "bestaudio/best"}
+    options = {"Auto High Quality (MP4)": "best", "Audio Only (MP3)": "bestaudio"}
     
     height_map = {}
     for f in formats:
@@ -223,8 +241,6 @@ if st.session_state.video_info and st.session_state.video_url == url:
         for h in sorted_heights:
             res_str = f"{h}p (mp4)"
             options[res_str] = f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
-    else:
-        options["Best Quality Available"] = "bestvideo+bestaudio/best"
 
     selected_res = st.selectbox(t["select_format"], list(options.keys()))
 

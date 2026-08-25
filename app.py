@@ -200,6 +200,13 @@ if "target_url" in st.session_state and url_input.strip():
                 'quiet': True,
                 'no_warnings': True,
                 'nocheckcertificate': True,
+                # 🔥 YouTube Security Bypass Options
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],
+                        'skip': ['hls', 'dash']
+                    }
+                }
             }
 
             # Secrets থেকে তৈরি কুকি ফাইল থাকলে তা যুক্ত করা

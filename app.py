@@ -2,8 +2,9 @@ import streamlit as st
 import yt_dlp
 import os
 import glob
+import tempfile
 
-# ১. পেজ কনফিগারেশন
+# ১. পেজ সেটআপ
 st.set_page_config(
     page_title="SILENT Universal Downloader",
     page_icon="🎬",
@@ -11,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম ও কালার সিলেক্টর
+# ২. ডাইনামিক থিম CSS
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
 if theme_choice == "Dark Animated":
@@ -83,14 +84,20 @@ st.markdown("""
     background-color: #ff6b6b;
     transform: translateY(-2px);
 }
-@media (max-width: 768px) {
-    .stApp { padding: 10px; }
-    .builder-name { font-size: 16px; }
-}
 </style>
 """, unsafe_allow_html=True)
 
-# ৩. ভাষা ব্যাকএন্ড
+# ৩. কুকিজ হ্যান্ডলিং (Streamlit Secrets অথবা cookies.txt থেকে)
+cookie_path = None
+if "YOUTUBE_COOKIES" in st.secrets:
+    temp_cookie = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8')
+    temp_cookie.write(st.secrets["YOUTUBE_COOKIES"])
+    temp_cookie.close()
+    cookie_path = temp_cookie.name
+elif os.path.exists("cookies.txt"):
+    cookie_path = "cookies.txt"
+
+# ৪. মাল্টি-ল্যাঙ্গুয়েজ টেক্সট
 TEXTS = {
     "bn": {
         "title": "🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার",
@@ -98,10 +105,10 @@ TEXTS = {
         "url_label": "ভিডিও লিঙ্কটি এখানে দিন:",
         "url_placeholder": "https://www.youtube.com/watch?v=...",
         "fetch_btn": "ভিডিও প্রসেস করুন 🔍",
-        "fetching": "ভিডিও তথ্য আনা হচ্ছে... একটু অপেক্ষা করুন।",
+        "fetching": "ভিডিওর তথ্য আনা হচ্ছে... একটু অপেক্ষা করুন।",
         "select_format": "রেজোলিউশন / কোয়ালিটি বাছাই করুন:",
         "download_start": "ডাউনলোড শুরু করুন ⬇️",
-        "downloading": "ভিডিও প্রসেসিং চলছে... সময় লাগতে পারে।",
+        "downloading": "ভিডিও প্রসেসিং ও ডাউনলোড চলছে...",
         "success": "ডাউনলোড প্রস্তুত!",
         "download_file_btn": "💾 ফাইলটি সেভ করুন (Save File)",
         "err_empty": "দয়া করে একটি সঠিক লিঙ্ক দিন।",
@@ -133,7 +140,6 @@ with col2:
 
 t = TEXTS[lang_code]
 
-# হেডার ও ব্র্যান্ডিং
 st.title(t["title"])
 st.markdown('<div class="builder-name">✨ Made by SILENT ✨</div>', unsafe_allow_html=True)
 st.write(t["subtitle"])
@@ -145,23 +151,28 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# 🟢 Bot Detection Bypass Configuration (TV Client, iOS, Embed & User-Agent Rotation)
+# 🟢 অল-ইন-ওয়ান বট বাইপাস ও ডাইনামিক কনফিগারেশন
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
     'no_warnings': True,
+    'noplaylist': True,
     'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
     },
     'extractor_args': {
         'youtube': {
-            'player_client': ['tv', 'ios', 'mweb', 'web_creator'],
+            'player_client': ['android', 'ios', 'mweb', 'web_embedded'],
             'player_skip': ['webpage', 'configs'],
         }
     }
 }
 
+if cookie_path:
+    COMMON_YDL_OPTS['cookiefile'] = cookie_path
+
+# ৫. ভিডিও তথ্য সংগ্রহ
 if st.button(t["fetch_btn"]):
     if not url.strip():
         st.warning(t["err_empty"])
@@ -176,6 +187,7 @@ if st.button(t["fetch_btn"]):
             except Exception as e:
                 st.error(f"{t['err_fetch']} {str(e)}")
 
+# ৬. ভিডিও রেজোলিউশন ও ডাউনলোড ইন্টারফেস
 if st.session_state.video_info and st.session_state.video_url == url:
     info = st.session_state.video_info
     title = info.get('title', 'Video')
@@ -213,6 +225,7 @@ if st.session_state.video_info and st.session_state.video_url == url:
     if st.button(t["download_start"]):
         with st.spinner(t["downloading"]):
             try:
+                # পুরানো ক্যাশ ফাইল মুছে ফেলা
                 for old_file in glob.glob("dl_file*"):
                     try:
                         os.remove(old_file)

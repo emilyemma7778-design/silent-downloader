@@ -3,7 +3,7 @@ import yt_dlp
 import os
 import glob
 
-# ১. পেজ কনফিগারেশন (মোবাইল ও ডেসকটপ রেসপন্সিভ)
+# ১. পেজ কনফিগারেশন
 st.set_page_config(
     page_title="SILENT Universal Downloader",
     page_icon="🎬",
@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম ও কালার সিলেক্টর (Dark Animation / Light Mode)
+# ২. থিম ও কালার সিলেক্টর
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
 if theme_choice == "Dark Animated":
@@ -145,7 +145,6 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# yt-dlp গ্লোবাল অপশন (403 Error প্রতিরোধ)
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
@@ -184,23 +183,26 @@ if st.session_state.video_info and st.session_state.video_url == url:
     formats = info.get('formats', [])
     options = {"Audio Only (MP3)": "bestaudio/best"}
     
-    # 🟢 ফিক্সড রেজোলিউশন লজিক: mhtml এবং ফালতু স্ন্যাপশট ফরম্যাট ফিল্টার করা
+    # 🎯 আপডেট করা রেজোলিউশন ডিটেকশন লজিক
+    heights = set()
     for f in formats:
-        height = f.get('height')
+        h = f.get('height')
         ext = f.get('ext', '')
         vcodec = f.get('vcodec', 'none')
-        
-        if height and ext != 'mhtml' and vcodec != 'none':
-            res_str = f"{height}p ({ext})"
-            if res_str not in options:
-                options[res_str] = f"bestvideo[height={height}]+bestaudio/best[height={height}]/best"
+        # mhtml এবং ভিডিও-বিহীন ফরম্যাট বাদ দিয়ে রেজোলিউশন হাইট বের করা
+        if h and ext != 'mhtml' and vcodec != 'none':
+            heights.add(h)
+
+    # রেজোলিউশন ছোট থেকে বড় অনুযায়ী সাজানো (যেমন: 144p, 360p, 480p, 720p, 1080p)
+    for h in sorted(list(heights), reverse=True):
+        res_str = f"{h}p (mp4)"
+        options[res_str] = f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
 
     selected_res = st.selectbox(t["select_format"], list(options.keys()))
 
     if st.button(t["download_start"]):
         with st.spinner(t["downloading"]):
             try:
-                # পুরনো টেম্পোরারি ফাইল রিমুভ
                 for old_file in glob.glob("dl_file*"):
                     try:
                         os.remove(old_file)
@@ -220,6 +222,7 @@ if st.session_state.video_info and st.session_state.video_url == url:
                     }]
                 else:
                     ydl_opts['format'] = options[selected_res]
+                    ydl_opts['merge_output_format'] = 'mp4'
 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])

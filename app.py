@@ -145,11 +145,16 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# 🟢 ফিক্সড গ্লোবাল অপশন (সব রেজোলিউশন আনলক করতে)
+# 🎯 HTTP Error 403 ফিক্স করার জন্য হেডার ও প্লেয়ার ক্লায়েন্ট অপশন
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
-    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['mweb', 'android']
+        }
+    }
 }
 
 if st.button(t["fetch_btn"]):
@@ -179,12 +184,10 @@ if st.session_state.video_info and st.session_state.video_url == url:
     formats = info.get('formats', [])
     options = {"Audio Only (MP3)": "bestaudio/best"}
     
-    # 🟢 সব ধরনের ভিডিও ফরম্যাটের হাইট ডিটেক্ট করার নতুন লজিক
     heights = set()
     for f in formats:
         h = f.get('height')
         ext = f.get('ext', '')
-        # mhtml বাদ দিয়ে যেকোনো বৈধ ভিডিও হাইট সংগ্রহ করা
         if h and ext != 'mhtml':
             heights.add(int(h))
 

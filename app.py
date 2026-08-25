@@ -9,68 +9,24 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম এবং কিউট ক্যাট অ্যানিমেশন CSS
+# ২. থিম সিলেক্ট
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
-base_style = """
-<style>
-/* Cat Animation Container */
-.cat-container {
-    text-align: center;
-    margin: 20px 0;
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 15px;
-    border: 1px dashed #ff94c2;
-}
-
-/* Cute Bouncing Cat Icon */
-.cute-cat {
-    font-size: 50px;
-    display: inline-block;
-    animation: catPlay 1.2s infinite alternate ease-in-out;
-}
-
-@keyframes catPlay {
-    0% {
-        transform: translateY(0) rotate(0deg) scale(1);
-    }
-    50% {
-        transform: translateY(-15px) rotate(-10deg) scale(1.1);
-    }
-    100% {
-        transform: translateY(0) rotate(10deg) scale(1);
-    }
-}
-
-.playing-text {
-    font-size: 16px;
-    font-weight: bold;
-    color: #ff94c2;
-    margin-top: 8px;
-    animation: blinkText 1.5s infinite;
-}
-
-@keyframes blinkText {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-</style>
-"""
-
+# CSS স্টাইলিং (HTML Component দিয়ে রেন্ডার করা হয়েছে যেন কোড শো না করে)
 if theme_choice == "Dark Animated":
-    theme_css = base_style + """
-    <style>
+    st.components.v1.html("""
+    <script>
+    var css = `
     @keyframes gradient {
         0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
     }
     .stApp {
-        background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1a1a2e);
-        background-size: 400% 400%;
-        animation: gradient 12s ease infinite;
-        color: #ffffff;
+        background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1a1a2e) !important;
+        background-size: 400% 400% !important;
+        animation: gradient 12s ease infinite !important;
+        color: #ffffff !important;
     }
     h1, h2, h3, p, label, .stMarkdown { color: #ffffff !important; }
     .builder-name {
@@ -84,14 +40,58 @@ if theme_choice == "Dark Animated":
         border: 2px solid #ffd700;
         margin-bottom: 20px;
     }
-    </style>
-    """
+    .cat-container {
+        text-align: center;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 15px;
+        border: 1px dashed #ff94c2;
+    }
+    .cute-cat {
+        font-size: 50px;
+        display: inline-block;
+        animation: catPlay 1.2s infinite alternate ease-in-out;
+    }
+    @keyframes catPlay {
+        0% { transform: translateY(0) rotate(0deg) scale(1); }
+        50% { transform: translateY(-15px) rotate(-10deg) scale(1.1); }
+        100% { transform: translateY(0) rotate(10deg) scale(1); }
+    }
+    .playing-text {
+        font-size: 16px;
+        font-weight: bold;
+        color: #ff94c2;
+        margin-top: 8px;
+        animation: blinkText 1.5s infinite;
+    }
+    @keyframes blinkText {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    .stButton>button {
+        width: 100%;
+        background-color: #ff4b4b;
+        color: white;
+        font-weight: bold;
+        border-radius: 10px;
+        border: none;
+        padding: 12px 20px;
+        font-size: 16px;
+    }
+    `;
+    var style = parent.document.createElement('style');
+    style.innerHTML = css;
+    parent.document.head.appendChild(style);
+    </script>
+    """, height=0)
 else:
-    theme_css = base_style + """
-    <style>
+    st.components.v1.html("""
+    <script>
+    var css = `
     .stApp {
-        background-color: #f4f7f6;
-        color: #333333;
+        background-color: #f4f7f6 !important;
+        color: #333333 !important;
     }
     h1, h2, h3, p, label, .stMarkdown { color: #2c3e50 !important; }
     .builder-name {
@@ -105,30 +105,51 @@ else:
         border: 2px solid #d35400;
         margin-bottom: 20px;
     }
-    </style>
-    """
-
-st.markdown(theme_css, unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-.stButton>button {
-    width: 100%;
-    background-color: #ff4b4b;
-    color: white;
-    font-weight: bold;
-    border-radius: 10px;
-    border: none;
-    padding: 12px 20px;
-    font-size: 16px;
-    transition: all 0.3s ease;
-}
-.stButton>button:hover {
-    background-color: #ff6b6b;
-    transform: translateY(-2px);
-}
-</style>
-""", unsafe_allow_html=True)
+    .cat-container {
+        text-align: center;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 15px;
+        border: 1px dashed #ff4b4b;
+    }
+    .cute-cat {
+        font-size: 50px;
+        display: inline-block;
+        animation: catPlay 1.2s infinite alternate ease-in-out;
+    }
+    @keyframes catPlay {
+        0% { transform: translateY(0) rotate(0deg) scale(1); }
+        50% { transform: translateY(-15px) rotate(-10deg) scale(1.1); }
+        100% { transform: translateY(0) rotate(10deg) scale(1); }
+    }
+    .playing-text {
+        font-size: 16px;
+        font-weight: bold;
+        color: #ff4b4b;
+        margin-top: 8px;
+        animation: blinkText 1.5s infinite;
+    }
+    @keyframes blinkText {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    .stButton>button {
+        width: 100%;
+        background-color: #ff4b4b;
+        color: white;
+        font-weight: bold;
+        border-radius: 10px;
+        border: none;
+        padding: 12px 20px;
+        font-size: 16px;
+    }
+    `;
+    var style = parent.document.createElement('style');
+    style.innerHTML = css;
+    parent.document.head.appendChild(style);
+    </script>
+    """, height=0)
 
 # ৩. ল্যাঙ্গুয়েজ টেক্সট
 TEXTS = {
@@ -203,12 +224,12 @@ if "target_url" in st.session_state and url_input.strip():
     <div style="text-align: center;">
         <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
             <a href="{cobalt_link}" target="_blank" style="text-decoration: none; flex: 1; min-width: 200px;">
-                <button style="width: 100%; background: #22c55e; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;">
+                <button style="width: 100%; background: #22c55e; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer;">
                     🚀 Main Server (Direct Fast Stream)
                 </button>
             </a>
             <a href="{ss_link}" target="_blank" style="text-decoration: none; flex: 1; min-width: 200px;">
-                <button style="width: 100%; background: #3b82f6; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;">
+                <button style="width: 100%; background: #3b82f6; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer;">
                     ⚡ Mirror Server (Fallback Download)
                 </button>
             </a>

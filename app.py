@@ -1,6 +1,7 @@
 import streamlit as st
+import json
 
-# ১. পেজ কনফিগারেশন
+# ১. পেজ সেটআপ
 st.set_page_config(
     page_title="SILENT Universal Downloader",
     page_icon="🎬",
@@ -8,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. CSS ইনজেকশন (UI, Theme & Cat Animations)
+# ২. CSS ইনজেকশন
 st.components.v1.html("""
 <script>
 var css = `
@@ -64,28 +65,17 @@ h1, h2, h3, p, label, .stMarkdown { color: #ffffff !important; }
     font-size: 16px;
 }
 `;
-var style = parent.document.createElement('style');
+var style = parent.document.head.appendChild(parent.document.createElement('style'));
 style.innerHTML = css;
-parent.document.head.appendChild(style);
 </script>
 """, height=0)
 
-# ৩. টেক্সট ও টাইটেল
+# ৩. টাইটেল ও ইনপুট
 st.title("🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার")
 st.markdown('<div class="builder-name">✨ Made by SILENT ✨</div>', unsafe_allow_html=True)
-st.write("যেকোনো ওয়েবসাইটের লিঙ্ক পেস্ট করে আপনার সাইটের ভেতরেই সরাসরি প্রসেস ও ডাউনলোড করুন।")
+st.write("যেকোনো ওয়েবসাইটের লিঙ্ক পেস্ট করে আপনার সাইটের ভেতরেই সরাসরি সেভ করুন।")
 
 url_input = st.text_input("ভিডিও লিঙ্কটি এখানে দিন:", placeholder="https://www.youtube.com/watch?v=...")
-
-quality_options = [
-    "1080p Full HD (MP4)",
-    "720p HD (MP4)",
-    "480p SD (MP4)",
-    "360p Low (MP4)",
-    "Audio Only (MP3)"
-]
-
-selected_quality = st.selectbox("রেজোলিউশন / কোয়ালিটি বাছাই করুন:", quality_options)
 
 if st.button("ভিডিও প্রসেস করুন 🔍"):
     if not url_input.strip():
@@ -102,25 +92,73 @@ if "target_url" in st.session_state and url_input.strip():
     st.markdown("""
     <div class="cat-container">
         <div class="cute-cat">🐱🐾 🧶</div>
-        <div class="playing-text">ক্যাট আপনার ভিডিও তৈরি করছে... নিচে আপনার সাইটেই ডাউনলোড অপশন প্রস্তুত! ✨</div>
+        <div class="playing-text">ক্যাট ভিডিও লিংক প্রসেস করেছে! নিচে আপনার পছন্দমতো ফাইল সিলেক্ট করুন:</div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # 🟢 100% In-Site Player & Stream Downloader (Client-Side Rendering)
-    in_site_engine = f"""
-    <div id="download-box" style="background: rgba(255, 255, 255, 0.07); padding: 20px; border-radius: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.15);">
-        <p style="color: #4ade80; font-weight: bold; font-size: 18px; margin-bottom: 10px;">✅ Direct Stream Ready!</p>
-        
-        <div id="loader" style="color: #ffd700; font-size: 14px; margin-bottom: 10px;">অটোমেটিক স্ট্রিম অপটিমাইজ করা হচ্ছে...</div>
 
-        <iframe id="stream-frame" src="https://yt1s.io/api/widget?url={clean_url}" 
-                style="width:100%; height:320px; border:none; border-radius:10px; background:transparent;" 
-                onload="document.getElementById('loader').style.display='none';">
-        </iframe>
+    # 🟢 Pure Client-side Downloader (No Redirect, In-Site Download)
+    clean_url_json = json.dumps(clean_url)
+    
+    downloader_html = f"""
+    <div id="loader-box" style="text-align: center; padding: 20px; color: #ffd700; font-weight: bold;">
+        ⌛ ফাইল লিঙ্ক জেনারেট করা হচ্ছে...
     </div>
+    <div id="download-links" style="display: flex; flex-direction: column; gap: 12px; width: 100%;"></div>
+
+    <script>
+    (function() {{
+        const videoUrl = {clean_url_json};
+        const box = document.getElementById('download-links');
+        const loader = document.getElementById('loader-box');
+
+        fetch('https://api.cobalt.tools/api/json', {{
+            method: 'POST',
+            headers: {{
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }},
+            body: JSON.stringify({{ url: videoUrl }})
+        }})
+        .then(res => res.json())
+        .then(data => {{
+            loader.style.display = 'none';
+            if(data.url) {{
+                box.innerHTML = `
+                    <a href="${{data.url}}" download style="text-decoration:none;">
+                        <button style="width:100%; background:#22c55e; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; font-size:16px; cursor:pointer;">
+                            ⬇️ Direct Download Video (Best Quality)
+                        </button>
+                    </a>`;
+            }} else {{
+                // Backup Downloader Fetcher
+                const cleanId = videoUrl.replace(/.*v=([^&]+).*/, '$1').replace(/.*youtu\.be\/([^?]+).*/, '$1');
+                box.innerHTML = `
+                    <a href="https://loader.to/api/button/?url=${{encodeURIComponent(videoUrl)}}&f=mp4" download target="_self" style="text-decoration:none;">
+                        <button style="width:100%; background:#22c55e; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; font-size:16px; cursor:pointer;">
+                            ⬇️ Direct Download MP4 (HD)
+                        </button>
+                    </a>
+                    <a href="https://loader.to/api/button/?url=${{encodeURIComponent(videoUrl)}}&f=mp3" download target="_self" style="text-decoration:none;">
+                        <button style="width:100%; background:#3b82f6; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; font-size:16px; cursor:pointer;">
+                            🎵 Direct Download Audio (MP3)
+                        </button>
+                    </a>`;
+            }}
+        }})
+        .catch(err => {{
+            loader.style.display = 'none';
+            box.innerHTML = `
+                <a href="https://loader.to/api/button/?url=${{encodeURIComponent(videoUrl)}}&f=mp4" style="text-decoration:none;">
+                    <button style="width:100%; background:#22c55e; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; font-size:16px; cursor:pointer;">
+                        ⬇️ Direct Download MP4 Video
+                    </button>
+                </a>`;
+        }});
+    }})();
+    </script>
     """
     
-    st.components.v1.html(in_site_engine, height=390)
+    st.components.v1.html(downloader_html, height=180)
 
 st.markdown("---")
 st.markdown('<p style="text-align: center;">SILENT Universal Downloader | Mobile & Desktop Supported</p>', unsafe_allow_html=True)

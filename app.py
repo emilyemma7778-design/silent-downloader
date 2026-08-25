@@ -151,19 +151,22 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# 🟢 অল-ইন-ওয়ান বট বাইপাস ও ডাইনামিক কনফিগারেশন
+# 🟢 Error 152/18 ও বট বাইপাস কনফিগারেশন
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
     'no_warnings': True,
     'noplaylist': True,
+    'ignoreerrors': True,
+    'geo_bypass': True,
     'http_headers': {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
     },
     'extractor_args': {
         'youtube': {
-            'player_client': ['android', 'ios', 'mweb', 'web_embedded'],
+            'player_client': ['ios', 'android', 'mweb'],
             'player_skip': ['webpage', 'configs'],
         }
     }
@@ -187,7 +190,7 @@ if st.button(t["fetch_btn"]):
             except Exception as e:
                 st.error(f"{t['err_fetch']} {str(e)}")
 
-# ৬. ভিডিও রেজোলিউশন ও ডাউনলোড ইন্টারফেস
+# ৬. রেজোলিউশন ও ডাউনলোড হ্যান্ডলিং
 if st.session_state.video_info and st.session_state.video_url == url:
     info = st.session_state.video_info
     title = info.get('title', 'Video')
@@ -225,7 +228,6 @@ if st.session_state.video_info and st.session_state.video_url == url:
     if st.button(t["download_start"]):
         with st.spinner(t["downloading"]):
             try:
-                # পুরানো ক্যাশ ফাইল মুছে ফেলা
                 for old_file in glob.glob("dl_file*"):
                     try:
                         os.remove(old_file)

@@ -151,7 +151,7 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# 🟢 Error 152/18 ও বট বাইপাস কনফিগারেশন
+# 🟢 ইউটিউব ডিটেকশন ও ক্লায়েন্ট বাইপাস কনফিগারেশন
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
@@ -166,7 +166,7 @@ COMMON_YDL_OPTS = {
     },
     'extractor_args': {
         'youtube': {
-            'player_client': ['ios', 'android', 'mweb'],
+            'player_client': ['android', 'ios'],
             'player_skip': ['webpage', 'configs'],
         }
     }
@@ -182,9 +182,12 @@ if st.button(t["fetch_btn"]):
     else:
         with st.spinner(t["fetching"]):
             try:
+                # লিঙ্ক ক্লিন-আপ
+                clean_url = url.split("?si=")[0].split("&si=")[0]
+                
                 ydl_opts = COMMON_YDL_OPTS.copy()
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
+                    info = ydl.extract_info(clean_url, download=False)
                     st.session_state.video_info = info
                     st.session_state.video_url = url
             except Exception as e:
@@ -234,6 +237,7 @@ if st.session_state.video_info and st.session_state.video_url == url:
                     except:
                         pass
 
+                clean_url = url.split("?si=")[0].split("&si=")[0]
                 outtmpl = 'dl_file.%(ext)s'
                 ydl_opts = COMMON_YDL_OPTS.copy()
                 ydl_opts['outtmpl'] = outtmpl
@@ -250,7 +254,7 @@ if st.session_state.video_info and st.session_state.video_url == url:
                     ydl_opts['merge_output_format'] = 'mp4'
 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+                    ydl.download([clean_url])
 
                 downloaded_files = glob.glob("dl_file*")
                 if downloaded_files:

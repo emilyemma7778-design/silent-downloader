@@ -1,9 +1,6 @@
 import streamlit as st
-import yt_dlp
-import os
-import glob
-import tempfile
 import requests
+import re
 
 # ১. পেজ সেটআপ
 st.set_page_config(
@@ -70,7 +67,7 @@ st.markdown(theme_css, unsafe_allow_html=True)
 
 st.markdown("""
 <style>
-.stButton>button {
+.stButton>button, .stDownloadButton>button {
     width: 100%;
     background-color: #ff4b4b;
     color: white;
@@ -81,24 +78,14 @@ st.markdown("""
     font-size: 16px;
     transition: all 0.3s ease;
 }
-.stButton>button:hover {
+.stButton>button:hover, .stDownloadButton>button:hover {
     background-color: #ff6b6b;
     transform: translateY(-2px);
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ৩. কুকিজ হ্যান্ডলিং
-cookie_path = None
-if "YOUTUBE_COOKIES" in st.secrets:
-    temp_cookie = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8')
-    temp_cookie.write(st.secrets["YOUTUBE_COOKIES"])
-    temp_cookie.close()
-    cookie_path = temp_cookie.name
-elif os.path.exists("cookies.txt"):
-    cookie_path = "cookies.txt"
-
-# ৪. ল্যাঙ্গুয়েজ টেক্সট
+# ৩. ল্যাঙ্গুয়েজ টেক্সট
 TEXTS = {
     "bn": {
         "title": "🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার",
@@ -106,15 +93,11 @@ TEXTS = {
         "url_label": "ভিডিও লিঙ্কটি এখানে দিন:",
         "url_placeholder": "https://www.youtube.com/watch?v=...",
         "fetch_btn": "ভিডিও প্রসেস করুন 🔍",
-        "fetching": "ভিডিওর তথ্য আনা হচ্ছে... একটু অপেক্ষা করুন।",
+        "fetching": "ভিডিওর তথ্য প্রসেস করা হচ্ছে...",
         "select_format": "রেজোলিউশন / কোয়ালিটি বাছাই করুন:",
-        "download_start": "ডাউনলোড শুরু করুন ⬇️",
-        "downloading": "ভিডিও প্রসেসিং ও ডাউনলোড চলছে...",
-        "success": "ডাউনলোড প্রস্তুত!",
-        "download_file_btn": "💾 ফাইলটি সেভ করুন (Save File)",
+        "download_start": "ডাউনলোড লিঙ্ক তৈরি করুন ⬇️",
         "err_empty": "দয়া করে একটি সঠিক লিঙ্ক দিন।",
-        "err_fetch": "ভিডিওর তথ্য পাওয়া যায়নি: ",
-        "err_dl": "ডাউনলোড ব্যর্থ হয়েছে: "
+        "err_fetch": "ভিডিও প্রসেস করতে ব্যর্থ হয়েছে। লিঙ্কটি রি-চেক করুন।"
     },
     "en": {
         "title": "🎬 All-in-One Super Downloader",
@@ -122,15 +105,11 @@ TEXTS = {
         "url_label": "Enter Video Link Here:",
         "url_placeholder": "https://www.youtube.com/watch?v=...",
         "fetch_btn": "Process Video 🔍",
-        "fetching": "Fetching video info... Please wait.",
+        "fetching": "Processing video info...",
         "select_format": "Select Resolution / Quality:",
-        "download_start": "Start Download ⬇️",
-        "downloading": "Processing download... Please wait.",
-        "success": "Download Ready!",
-        "download_file_btn": "💾 Save File to Device",
+        "download_start": "Generate Download Link ⬇️",
         "err_empty": "Please enter a valid video link.",
-        "err_fetch": "Could not fetch video info: ",
-        "err_dl": "Download failed: "
+        "err_fetch": "Failed to process video. Please check the link."
     }
 }
 
@@ -147,146 +126,79 @@ st.write(t["subtitle"])
 
 url = st.text_input(t["url_label"], placeholder=t["url_placeholder"])
 
-if 'video_info' not in st.session_state:
-    st.session_state.video_info = None
-if 'video_url' not in st.session_state:
-    st.session_state.video_url = ""
-
-# 🟢 বাইপাস কনফিগারেশন (উইথ ফলব্যাক)
-COMMON_YDL_OPTS = {
-    'quiet': True,
-    'nocheckcertificate': True,
-    'no_warnings': True,
-    'noplaylist': True,
-    'ignoreerrors': True,
-    'geo_bypass': True,
-    'socket_timeout': 10,
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    },
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['ios', 'android', 'web_creator'],
-            'player_skip': ['webpage', 'configs'],
-        }
+# Cobalt API Integration Function
+def fetch_cobalt_download(video_url, quality="1080", is_audio=False):
+    api_url = "https://api.cobalt.tools/"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
     }
-}
+    payload = {
+        "url": video_url,
+        "videoQuality": quality,
+        "downloadMode": "audio" if is_audio else "auto"
+    }
+    
+    response = requests.post(api_url, json=payload, headers=headers, timeout=15)
+    return response.json()
 
-if cookie_path:
-    COMMON_YDL_OPTS['cookiefile'] = cookie_path
-
-# ৫. ভিডিও তথ্য সংগ্রহ
 if st.button(t["fetch_btn"]):
     if not url.strip():
         st.warning(t["err_empty"])
     else:
-        with st.spinner(t["fetching"]):
-            clean_url = url.split("?si=")[0].split("&si=")[0]
-            fetched = False
-            
-            # পদ্ধতি ১: yt-dlp প্রাইমারি ড্রাইভার
-            try:
-                ydl_opts = COMMON_YDL_OPTS.copy()
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(clean_url, download=False)
-                    if info:
-                        st.session_state.video_info = info
-                        st.session_state.video_url = url
-                        fetched = True
-            except Exception:
-                pass
+        st.session_state["valid_url"] = url.strip()
 
-            # পদ্ধতি ২: কাস্টম API ফলব্যাক (yt-dlp ব্লক হলে অটোমেটিক ট্রাই হবে)
-            if not fetched:
-                try:
-                    oembed_url = f"https://www.youtube.com/oembed?url={clean_url}&format=json"
-                    res = requests.get(oembed_url, timeout=5).json()
-                    st.session_state.video_info = {
-                        'title': res.get('title', 'YouTube Video'),
-                        'thumbnail': res.get('thumbnail_url'),
-                        'formats': []
-                    }
-                    st.session_state.video_url = url
-                    fetched = True
-                except Exception as e:
-                    st.error(f"{t['err_fetch']} {str(e)}")
-
-# ৬. রেজোলিউশন ও ডাউনলোড হ্যান্ডলিং
-if st.session_state.video_info and st.session_state.video_url == url:
-    info = st.session_state.video_info
-    title = info.get('title', 'Video')
-    thumbnail = info.get('thumbnail')
-
+if "valid_url" in st.session_state and st.session_state["valid_url"] == url.strip():
     st.markdown("---")
-    st.subheader(f"📹 {title}")
-    if thumbnail:
-        st.image(thumbnail, width="stretch")
-
-    formats = info.get('formats', [])
-    options = {"Auto High Quality (MP4)": "best", "Audio Only (MP3)": "bestaudio"}
     
-    height_map = {}
-    for f in formats:
-        h = f.get('height')
-        ext = f.get('ext', '')
-        vcodec = f.get('vcodec', 'none')
-        
-        if h and isinstance(h, int) and ext != 'mhtml' and vcodec != 'none':
-            if h not in height_map:
-                height_map[h] = f
-
-    sorted_heights = sorted(list(height_map.keys()), reverse=True)
-
-    if sorted_heights:
-        for h in sorted_heights:
-            res_str = f"{h}p (mp4)"
-            options[res_str] = f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
-
-    selected_res = st.selectbox(t["select_format"], list(options.keys()))
-
+    # রেজোলিউশন অপশন ডিক্লেয়ারেশন
+    quality_options = {
+        "1080p Full HD (MP4)": "1080",
+        "720p HD (MP4)": "720",
+        "480p SD (MP4)": "480",
+        "360p Low (MP4)": "360",
+        "Audio Only (MP3)": "audio"
+    }
+    
+    selected_option = st.selectbox(t["select_format"], list(quality_options.keys()))
+    
     if st.button(t["download_start"]):
-        with st.spinner(t["downloading"]):
+        with st.spinner(t["fetching"]):
             try:
-                for old_file in glob.glob("dl_file*"):
-                    try:
-                        os.remove(old_file)
-                    except:
-                        pass
-
-                clean_url = url.split("?si=")[0].split("&si=")[0]
-                outtmpl = 'dl_file.%(ext)s'
-                ydl_opts = COMMON_YDL_OPTS.copy()
-                ydl_opts['outtmpl'] = outtmpl
-
-                if selected_res == "Audio Only (MP3)":
-                    ydl_opts['format'] = 'bestaudio/best'
-                    ydl_opts['postprocessors'] = [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                        'preferredquality': '192',
-                    }]
+                selected_val = quality_options[selected_option]
+                is_audio = (selected_val == "audio")
+                quality_code = "1080" if is_audio else selected_val
+                
+                res = fetch_cobalt_download(st.session_state["valid_url"], quality=quality_code, is_audio=is_audio)
+                
+                if res.get("status") in ["tunnel", "redirect"]:
+                    download_url = res.get("url")
+                    st.success("🎉 আপনার ভিডিও প্রস্তুত!")
+                    st.markdown(f'''
+                        <a href="{download_url}" target="_blank" style="text-decoration: none;">
+                            <button style="
+                                width: 100%;
+                                background-color: #28a745;
+                                color: white;
+                                font-weight: bold;
+                                border-radius: 10px;
+                                border: none;
+                                padding: 14px 20px;
+                                font-size: 18px;
+                                cursor: pointer;
+                                margin-top: 10px;">
+                                💾 ফাইলটি সেভ করুন (Click to Download)
+                            </button>
+                        </a>
+                    ''', unsafe_allow_html=True)
+                elif res.get("status") == "picker":
+                    st.success("🎉 আপনার ভিডিও প্রস্তুত!")
+                    for item in res.get("picker", []):
+                        st.markdown(f"[⬇️ Download ({item.get('type', 'file')})]({item.get('url')})")
                 else:
-                    ydl_opts['format'] = options[selected_res]
-                    ydl_opts['merge_output_format'] = 'mp4'
-
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([clean_url])
-
-                downloaded_files = glob.glob("dl_file*")
-                if downloaded_files:
-                    file_path = downloaded_files[0]
-                    file_ext = file_path.split('.')[-1]
-
-                    with open(file_path, "rb") as file:
-                        st.success(t["success"])
-                        st.download_button(
-                            label=t["download_file_btn"],
-                            data=file,
-                            file_name=f"{title}.{file_ext}",
-                            mime=f"video/{file_ext}" if file_ext != "mp3" else "audio/mp3"
-                        )
+                    st.error(f"{t['err_fetch']} ({res.get('text', 'Unknown Error')})")
             except Exception as e:
-                st.error(f"{t['err_dl']} {str(e)}")
+                st.error(f"{t['err_fetch']} {str(e)}")
 
 st.markdown("---")
 st.markdown('<p style="text-align: center;">SILENT Universal Downloader | Mobile & Desktop Supported</p>', unsafe_allow_html=True)

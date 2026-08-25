@@ -145,19 +145,19 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# 🟢 HTTP 403 & High Resolution Bypass Config
+# 🟢 Bot Detection Bypass Configuration (TV Client, iOS, Embed & User-Agent Rotation)
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
     'no_warnings': True,
     'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
     },
     'extractor_args': {
         'youtube': {
-            'player_client': ['ios', 'web', 'mweb']
+            'player_client': ['tv', 'ios', 'mweb', 'web_creator'],
+            'player_skip': ['webpage', 'configs'],
         }
     }
 }
@@ -189,7 +189,6 @@ if st.session_state.video_info and st.session_state.video_url == url:
     formats = info.get('formats', [])
     options = {"Audio Only (MP3)": "bestaudio/best"}
     
-    # 🟢 সব হাইট সঠিকভাবে ফিল্টার ও শর্ট করার লজিক
     height_map = {}
     for f in formats:
         h = f.get('height')

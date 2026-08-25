@@ -190,7 +190,6 @@ if "target_url" in st.session_state and url_input.strip():
     
     st.markdown("---")
     
-    # 🐾 Cute Cat Animation Section
     st.markdown("""
     <div class="cat-container">
         <div class="cute-cat">🐱🐾 🧶</div>
@@ -203,15 +202,15 @@ if "target_url" in st.session_state and url_input.strip():
             temp_dir = tempfile.gettempdir()
             out_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-            # কোয়ালিটি ফিল্টার এবং সোর্স সেটিংস
+            # Single-file Progressive Formats Prefer করা হচ্ছে (যা ffmpeg ছাড়াও মার্জিং ছাড়াই কাজ করে)
             if "1080p" in chosen_q:
-                fmt = 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best'
+                fmt = 'best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best'
             elif "720p" in chosen_q:
-                fmt = 'best[height<=720]/bestvideo[height<=720]+bestaudio/best'
+                fmt = 'best[ext=mp4][height<=720]/bestvideo[height<=720]+bestaudio/best'
             elif "480p" in chosen_q:
-                fmt = 'best[height<=480]/bestvideo[height<=480]+bestaudio/best'
+                fmt = 'best[ext=mp4][height<=480]/bestvideo[height<=480]+bestaudio/best'
             elif "360p" in chosen_q:
-                fmt = 'best[height<=360]/bestvideo[height<=360]+bestaudio/best'
+                fmt = 'best[ext=mp4][height<=360]/bestvideo[height<=360]+bestaudio/best'
             elif "Audio Only" in chosen_q:
                 fmt = 'bestaudio/best'
             else:
@@ -237,7 +236,6 @@ if "target_url" in st.session_state and url_input.strip():
                         
                     st.success(f"🎬 **শিরোনাম:** {title}")
                     
-                    # 🟢 Native Streamlit Direct Download Button (No external redirect)
                     ext = "mp3" if "Audio Only" in chosen_q else "mp4"
                     mime_type = "audio/mp3" if "Audio Only" in chosen_q else "video/mp4"
                     

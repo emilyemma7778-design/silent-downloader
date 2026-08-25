@@ -1,7 +1,5 @@
 import streamlit as st
-import yt_dlp
-import os
-import tempfile
+import requests
 
 # ১. পেজ কনফিগারেশন
 st.set_page_config(
@@ -168,10 +166,10 @@ st.write(t["subtitle"])
 url_input = st.text_input(t["url_label"], placeholder=t["url_placeholder"])
 
 quality_options = [
-    "1080p Full HD (MP4)",
-    "720p HD (MP4)",
-    "480p SD (MP4)",
-    "360p Low (MP4)",
+    "1080p Full HD",
+    "720p HD",
+    "480p SD",
+    "360p Low",
     "Audio Only (MP3)"
 ]
 
@@ -193,74 +191,63 @@ if "target_url" in st.session_state and url_input.strip():
     st.markdown("""
     <div class="cat-container">
         <div class="cute-cat">🐱🐾 🧶</div>
-        <div class="playing-text">ক্যাট আপনার ভিডিও প্রসেস করছে... ফাইল প্রস্তুত করা হচ্ছে! ✨</div>
+        <div class="playing-text">ক্যাট আপনার ভিডিও লিঙ্ক প্রস্তুত করেছে! নিচে ডাইরেক্ট ডাউনলোড করুন ✨</div>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.spinner("ভিডিও প্রসেস করা হচ্ছে... কিছু মুহূর্ত সময় দিন।"):
+    with st.spinner("লিঙ্ক প্রসেস করা হচ্ছে..."):
         try:
-            temp_dir = tempfile.gettempdir()
-            out_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
-
-            if "1080p" in chosen_q:
-                fmt = 'best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best'
-            elif "720p" in chosen_q:
-                fmt = 'best[ext=mp4][height<=720]/bestvideo[height<=720]+bestaudio/best'
-            elif "480p" in chosen_q:
-                fmt = 'best[ext=mp4][height<=480]/bestvideo[height<=480]+bestaudio/best'
-            elif "360p" in chosen_q:
-                fmt = 'best[ext=mp4][height<=360]/bestvideo[height<=360]+bestaudio/best'
-            elif "Audio Only" in chosen_q:
-                fmt = 'bestaudio/best'
+            # Cobalt API Payload Setup
+            quality_map = {
+                "1080p Full HD": "1080",
+                "720p HD": "720",
+                "480p SD": "480",
+                "360p Low": "360"
+            }
+            
+            payload = {"url": clean_url}
+            
+            if "Audio Only" in chosen_q:
+                payload["downloadMode"] = "audio"
+                payload["audioFormat"] = "mp3"
             else:
-                fmt = 'best'
+                payload["videoQuality"] = quality_map.get(chosen_q, "720")
 
-            # 480/403 Error Bypass Configuration
-            ydl_opts = {
-                'format': fmt,
-                'outtmpl': out_template,
-                'quiet': True,
-                'no_warnings': True,
-                'nocheckcertificate': True,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android', 'web', 'ios'],
-                        'skip': ['hls']
-                    }
-                },
-                'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                }
+            headers = {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
             }
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(clean_url, download=True)
-                file_path = ydl.prepare_filename(info)
-                title = info.get('title', 'video')
+            res = requests.post("https://api.cobalt.tools/api/json", json=payload, headers=headers, timeout=15)
+            data = res.json()
 
-                if os.path.exists(file_path):
-                    with open(file_path, "rb") as file_data:
-                        file_bytes = file_data.read()
-                        
-                    st.success(f"🎬 **শিরোনাম:** {title}")
-                    
-                    ext = "mp3" if "Audio Only" in chosen_q else "mp4"
-                    mime_type = "audio/mp3" if "Audio Only" in chosen_q else "video/mp4"
-                    
-                    st.download_button(
-                        label=f"⬇️ Direct Download ({chosen_q})",
-                        data=file_bytes,
-                        file_name=f"{title}.{ext}",
-                        mime=mime_type,
-                        use_container_width=True
-                    )
-                else:
-                    st.error("ফাইল তৈরি করতে সমস্যা হয়েছে। অন্য একটি কোয়ালিটি চেষ্টা করুন।")
+            if "url" in data:
+                download_link = data["url"]
+                st.success("🎉 ফাইল প্রসেস সম্পন্ন হয়েছে!")
+                
+                # Direct High-Speed Download Button
+                st.markdown(f'''
+                    <a href="{download_link}" target="_blank" style="text-decoration: none;">
+                        <button style="
+                            width: 100%;
+                            background-color: #28a745;
+                            color: white;
+                            font-weight: bold;
+                            border-radius: 10px;
+                            border: none;
+                            padding: 16px;
+                            font-size: 18px;
+                            cursor: pointer;
+                            margin-top: 10px;">
+                            ⬇️ Direct Download ({chosen_q})
+                        </button>
+                    </a>
+                ''', unsafe_allow_html=True)
+            else:
+                st.error("লিঙ্কটি প্রসেস করতে ব্যর্থ হয়েছে। প্ল্যাটফর্মের কোনো প্রাইভেট ভিডিও বা ভুল লিঙ্ক কিনা চেক করুন।")
 
         except Exception as e:
-            st.error(f"প্রসেস করতে সমস্যা হয়েছে: {str(e)}")
+            st.error(f"সার্ভারে কানেক্ট করতে সমস্যা হয়েছে: {str(e)}")
 
 st.markdown("---")
 st.markdown('<p style="text-align: center;">SILENT Universal Downloader | Mobile & Desktop Supported</p>', unsafe_allow_html=True)

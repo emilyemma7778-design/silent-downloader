@@ -3,7 +3,7 @@ import yt_dlp
 import os
 import tempfile
 
-# ১. পেজ সেটআপ
+# ১. পেজ কনফিগারেশন
 st.set_page_config(
     page_title="SILENT Universal Downloader",
     page_icon="🎬",
@@ -11,7 +11,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম সেটআপ
+# ২. ডাইনামিক কুকি ফাইল হ্যান্ডলার (Streamlit Secrets থেকে তৈরি)
+COOKIE_FILE_PATH = None
+if "YOUTUBE_COOKIES" in st.secrets:
+    COOKIE_FILE_PATH = os.path.join(tempfile.gettempdir(), "streamlit_yt_cookies.txt")
+    with open(COOKIE_FILE_PATH, "w", encoding="utf-8") as f:
+        f.write(st.secrets["YOUTUBE_COOKIES"])
+
+# ৩. থিম সেটআপ ও UI Styling
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
 if theme_choice == "Dark Animated":
@@ -132,6 +139,7 @@ else:
     </style>
     """, unsafe_allow_html=True)
 
+# ৪. মেইন অ্যাপ হেডার
 st.title("🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার")
 st.markdown('<div class="builder-name">✨ Made by SILENT ✨</div>', unsafe_allow_html=True)
 
@@ -154,12 +162,12 @@ if st.button("ভিডিও প্রসেস করুন 🔍"):
         st.session_state["target_url"] = url_input.strip()
         st.session_state["selected_q"] = selected_quality
 
+# ৫. ডাউনলোড প্রসেসিং লজিক
 if "target_url" in st.session_state and url_input.strip():
     clean_url = st.session_state["target_url"]
     chosen_q = st.session_state.get("selected_q", selected_quality)
     
     st.markdown("---")
-    
     st.markdown("""
     <div class="cat-container">
         <div class="cute-cat">🐱🐾 🧶</div>
@@ -172,6 +180,7 @@ if "target_url" in st.session_state and url_input.strip():
             temp_dir = tempfile.gettempdir()
             out_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
+            # ফরম্যাট নির্বাচন
             if "1080p" in chosen_q:
                 fmt = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best'
             elif "720p" in chosen_q:
@@ -193,9 +202,9 @@ if "target_url" in st.session_state and url_input.strip():
                 'nocheckcertificate': True,
             }
 
-            # কুকি ফাইল উপস্থিত থাকলে অটোমেটিক ব্যবহার করবে
-            if os.path.exists("cookies.txt"):
-                ydl_opts['cookiefile'] = "cookies.txt"
+            # Secrets থেকে তৈরি কুকি ফাইল থাকলে তা যুক্ত করা
+            if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+                ydl_opts['cookiefile'] = COOKIE_FILE_PATH
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(clean_url, download=True)

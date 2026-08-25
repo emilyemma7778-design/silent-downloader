@@ -145,14 +145,19 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
-# 🎯 HTTP Error 403 ফিক্স করার জন্য হেডার ও প্লেয়ার ক্লায়েন্ট অপশন
+# 🟢 HTTP 403 & High Resolution Bypass Config
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
-    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'no_warnings': True,
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    },
     'extractor_args': {
         'youtube': {
-            'player_client': ['mweb', 'android']
+            'player_client': ['ios', 'web', 'mweb']
         }
     }
 }
@@ -184,19 +189,25 @@ if st.session_state.video_info and st.session_state.video_url == url:
     formats = info.get('formats', [])
     options = {"Audio Only (MP3)": "bestaudio/best"}
     
-    heights = set()
+    # 🟢 সব হাইট সঠিকভাবে ফিল্টার ও শর্ট করার লজিক
+    height_map = {}
     for f in formats:
         h = f.get('height')
         ext = f.get('ext', '')
-        if h and ext != 'mhtml':
-            heights.add(int(h))
+        vcodec = f.get('vcodec', 'none')
+        
+        if h and isinstance(h, int) and ext != 'mhtml' and vcodec != 'none':
+            if h not in height_map:
+                height_map[h] = f
 
-    if heights:
-        for h in sorted(list(heights), reverse=True):
+    sorted_heights = sorted(list(height_map.keys()), reverse=True)
+
+    if sorted_heights:
+        for h in sorted_heights:
             res_str = f"{h}p (mp4)"
             options[res_str] = f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
     else:
-        options["Best Available Quality"] = "bestvideo+bestaudio/best"
+        options["Best Quality Available"] = "bestvideo+bestaudio/best"
 
     selected_res = st.selectbox(t["select_format"], list(options.keys()))
 

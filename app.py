@@ -1,6 +1,5 @@
 import streamlit as st
-import requests
-import re
+import urllib.parse
 
 # ১. পেজ সেটআপ
 st.set_page_config(
@@ -10,11 +9,57 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম CSS
+# ২. থিম এবং কিউট ক্যাট অ্যানিমেশন CSS
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
+base_style = """
+<style>
+/* Cat Animation Container */
+.cat-container {
+    text-align: center;
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    border: 1px dashed #ff94c2;
+}
+
+/* Cute Bouncing Cat Icon */
+.cute-cat {
+    font-size: 50px;
+    display: inline-block;
+    animation: catPlay 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes catPlay {
+    0% {
+        transform: translateY(0) rotate(0deg) scale(1);
+    }
+    50% {
+        transform: translateY(-15px) rotate(-10deg) scale(1.1);
+    }
+    100% {
+        transform: translateY(0) rotate(10deg) scale(1);
+    }
+}
+
+.playing-text {
+    font-size: 16px;
+    font-weight: bold;
+    color: #ff94c2;
+    margin-top: 8px;
+    animation: blinkText 1.5s infinite;
+}
+
+@keyframes blinkText {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+</style>
+"""
+
 if theme_choice == "Dark Animated":
-    theme_css = """
+    theme_css = base_style + """
     <style>
     @keyframes gradient {
         0% { background-position: 0% 50%; }
@@ -42,7 +87,7 @@ if theme_choice == "Dark Animated":
     </style>
     """
 else:
-    theme_css = """
+    theme_css = base_style + """
     <style>
     .stApp {
         background-color: #f4f7f6;
@@ -93,11 +138,8 @@ TEXTS = {
         "url_label": "ভিডিও লিঙ্কটি এখানে দিন:",
         "url_placeholder": "https://www.youtube.com/watch?v=...",
         "fetch_btn": "ভিডিও প্রসেস করুন 🔍",
-        "fetching": "ভিডিওর লিঙ্ক প্রসেস করা হচ্ছে...",
         "select_format": "রেজোলিউশন / কোয়ালিটি বাছাই করুন:",
-        "download_start": "ডাউনলোড লিঙ্ক তৈরি করুন ⬇️",
-        "err_empty": "দয়া করে একটি সঠিক লিঙ্ক দিন।",
-        "err_fetch": "ভিডিও স্ট্রিম লিঙ্ক এক্সট্র্যাক্ট করা সম্ভব হয়নি।"
+        "err_empty": "দয়া করে একটি সঠিক লিঙ্ক দিন।"
     },
     "en": {
         "title": "🎬 All-in-One Super Downloader",
@@ -105,11 +147,8 @@ TEXTS = {
         "url_label": "Enter Video Link Here:",
         "url_placeholder": "https://www.youtube.com/watch?v=...",
         "fetch_btn": "Process Video 🔍",
-        "fetching": "Processing video link...",
         "select_format": "Select Resolution / Quality:",
-        "download_start": "Generate Download Link ⬇️",
-        "err_empty": "Please enter a valid video link.",
-        "err_fetch": "Failed to extract video stream link."
+        "err_empty": "Please enter a valid video link."
     }
 }
 
@@ -126,100 +165,58 @@ st.write(t["subtitle"])
 
 url_input = st.text_input(t["url_label"], placeholder=t["url_placeholder"])
 
-def extract_youtube_id(url):
-    regex = r"(?:v=|\/([0-9A-Za-z_-]{11})|youtu\.be\/|\/embed\/|\/v\/|\/e\/|watch\?v=|\?v=)([^#\&\?]*)"
-    match = re.search(regex, url)
-    if match:
-        return match.group(1) if match.group(1) else match.group(2)
-    return None
+quality_options = [
+    "1080p Full HD (MP4)",
+    "720p HD (MP4)",
+    "480p SD (MP4)",
+    "360p Low (MP4)",
+    "Audio Only (MP3)"
+]
 
-def get_piped_streams(video_id):
-    instances = [
-        "https://pipedapi.kavin.rocks",
-        "https://api.piped.private.coffee",
-        "https://piped-api.garudalinux.org"
-    ]
-    for instance in instances:
-        try:
-            res = requests.get(f"{instance}/streams/{video_id}", timeout=5)
-            if res.status_code == 200:
-                return res.json()
-        except Exception:
-            continue
-    return None
+selected_quality = st.selectbox(t["select_format"], quality_options)
 
 if st.button(t["fetch_btn"]):
     if not url_input.strip():
         st.warning(t["err_empty"])
     else:
-        v_id = extract_youtube_id(url_input.strip())
-        if v_id:
-            with st.spinner(t["fetching"]):
-                data = get_piped_streams(v_id)
-                if data:
-                    st.session_state["stream_data"] = data
-                    st.session_state["active_url"] = url_input.strip()
-                else:
-                    st.error(t["err_fetch"])
-        else:
-            st.error(t["err_empty"])
+        st.session_state["target_url"] = url_input.strip()
 
-if "stream_data" in st.session_state and st.session_state.get("active_url") == url_input.strip():
-    data = st.session_state["stream_data"]
-    title = data.get("title", "YouTube Video")
+if "target_url" in st.session_state and url_input.strip():
+    clean_url = st.session_state["target_url"]
+    encoded_url = urllib.parse.quote(clean_url)
     
     st.markdown("---")
-    st.subheader(f"📹 {title}")
     
-    video_streams = data.get("videoStreams", [])
-    audio_streams = data.get("audioStreams", [])
+    # 🐾 Cute Cat Animation Section
+    st.markdown("""
+    <div class="cat-container">
+        <div class="cute-cat">🐱🐾 🧶</div>
+        <div class="playing-text">ক্যাট আপনার ভিডিও প্রসেস করছে... ডাউনলোড করতে নিচের সার্ভারে ক্লিক করুন! ✨</div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    options = {}
+    # 🟢 Download Buttons Section
+    cobalt_link = f"https://cobalt.tools/?url={encoded_url}"
+    ss_link = clean_url.replace("youtube.com", "ssyoutube.com").replace("youtu.be/", "ssyoutube.com/watch?v=")
     
-    # MP4 সোর্স ফিল্টার
-    for s in video_streams:
-        if s.get("format") == "MPEG_4" or s.get("mimeType") == "video/mp4":
-            quality = s.get("quality", "Video")
-            url = s.get("url")
-            if url and quality not in options:
-                options[f"{quality} (MP4)"] = url
-                
-    for a in audio_streams:
-        if "audio/mp4" in a.get("mimeType", "") or "audio/webm" in a.get("mimeType", ""):
-            url = a.get("url")
-            if url:
-                options["Audio Only (MP3/M4A)"] = url
-                break
-
-    if not options:
-        # Fallback to direct streams
-        for s in video_streams:
-            quality = s.get("quality", "Video")
-            url = s.get("url")
-            if url:
-                options[f"{quality}"] = url
-
-    selected_label = st.selectbox(t["select_format"], list(options.keys()))
-    
-    if selected_label:
-        dl_url = options[selected_label]
-        st.markdown(f'''
-            <a href="{dl_url}" target="_blank" download style="text-decoration: none;">
-                <button style="
-                    width: 100%;
-                    background-color: #28a745;
-                    color: white;
-                    font-weight: bold;
-                    border-radius: 10px;
-                    border: none;
-                    padding: 14px 20px;
-                    font-size: 18px;
-                    cursor: pointer;
-                    margin-top: 15px;">
-                    💾 ফাইলটি ডাউনলোড করুন (Direct Link)
+    embed_html = f"""
+    <div style="text-align: center;">
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <a href="{cobalt_link}" target="_blank" style="text-decoration: none; flex: 1; min-width: 200px;">
+                <button style="width: 100%; background: #22c55e; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;">
+                    🚀 Main Server (Direct Fast Stream)
                 </button>
             </a>
-        ''', unsafe_allow_html=True)
+            <a href="{ss_link}" target="_blank" style="text-decoration: none; flex: 1; min-width: 200px;">
+                <button style="width: 100%; background: #3b82f6; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;">
+                    ⚡ Mirror Server (Fallback Download)
+                </button>
+            </a>
+        </div>
+    </div>
+    """
+    
+    st.components.v1.html(embed_html, height=80)
 
 st.markdown("---")
 st.markdown('<p style="text-align: center;">SILENT Universal Downloader | Mobile & Desktop Supported</p>', unsafe_allow_html=True)

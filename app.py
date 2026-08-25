@@ -1,5 +1,7 @@
 import streamlit as st
 import yt_dlp
+import os
+import tempfile
 
 # ১. পেজ কনফিগারেশন
 st.set_page_config(
@@ -9,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম সিলেক্ট ও CSS ইনজেকশন
+# ২. থিম সেটআপ ও CSS
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
 if theme_choice == "Dark Animated":
@@ -130,7 +132,7 @@ else:
     </style>
     """, unsafe_allow_html=True)
 
-# ৩. ল্যাঙ্গুয়েজ ডিকশনারি
+# ৩. ল্যাঙ্গুয়েজ অপশন
 TEXTS = {
     "bn": {
         "title": "🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার",
@@ -192,63 +194,62 @@ if "target_url" in st.session_state and url_input.strip():
     st.markdown("""
     <div class="cat-container">
         <div class="cute-cat">🐱🐾 🧶</div>
-        <div class="playing-text">ক্যাট আপনার ভিডিও প্রসেস করছে... নিচে আপনার ডাউনলোডের বাটনটি তৈরি হচ্ছে! ✨</div>
+        <div class="playing-text">ক্যাট আপনার ভিডিও প্রসেস করছে... ফাইল প্রস্তুত করা হচ্ছে! ✨</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 🟢 High-Res Dynamic Stream Extractor
-    with st.spinner("ভিডিও এবং সিলেক্ট করা রেজোলিউশন লিংক এক্সট্র্যাক্ট করা হচ্ছে..."):
+    with st.spinner("ভিডিও প্রসেস করা হচ্ছে... কিছু মুহূর্ত সময় দিন।"):
         try:
-            # রেজোলিউশন ফিল্টার সেটআপ
+            temp_dir = tempfile.gettempdir()
+            out_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
+
+            # কোয়ালিটি ফিল্টার এবং সোর্স সেটিংস
             if "1080p" in chosen_q:
-                fmt = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'
+                fmt = 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best'
             elif "720p" in chosen_q:
-                fmt = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
+                fmt = 'best[height<=720]/bestvideo[height<=720]+bestaudio/best'
             elif "480p" in chosen_q:
-                fmt = 'bestvideo[height<=480]+bestaudio/best[height<=480]/best'
+                fmt = 'best[height<=480]/bestvideo[height<=480]+bestaudio/best'
             elif "360p" in chosen_q:
-                fmt = 'bestvideo[height<=360]+bestaudio/best[height<=360]/best'
+                fmt = 'best[height<=360]/bestvideo[height<=360]+bestaudio/best'
             elif "Audio Only" in chosen_q:
                 fmt = 'bestaudio/best'
             else:
                 fmt = 'best'
 
             ydl_opts = {
+                'format': fmt,
+                'outtmpl': out_template,
                 'quiet': True,
                 'no_warnings': True,
-                'format': fmt
+                'nocheckcertificate': True,
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(clean_url, download=False)
-                video_title = info.get('title', 'video')
-                
-                # ডাইরেক্ট ডাউনলোড লিঙ্ক চেক
-                direct_stream_url = info.get('url', None)
+                info = ydl.extract_info(clean_url, download=True)
+                file_path = ydl.prepare_filename(info)
+                title = info.get('title', 'video')
 
-                if direct_stream_url:
-                    st.success(f"🎬 **শিরোনাম:** {video_title}")
+                if os.path.exists(file_path):
+                    with open(file_path, "rb") as file_data:
+                        file_bytes = file_data.read()
+                        
+                    st.success(f"🎬 **শিরোনাম:** {title}")
                     
-                    # ⬇️ In-Site Direct Download Button
-                    st.markdown(f'''
-                        <a href="{direct_stream_url}" download="{video_title}.mp4" target="_blank" style="text-decoration: none;">
-                            <button style="
-                                width: 100%;
-                                background-color: #28a745;
-                                color: white;
-                                font-weight: bold;
-                                border-radius: 10px;
-                                border: none;
-                                padding: 16px;
-                                font-size: 18px;
-                                cursor: pointer;
-                                margin-top: 10px;">
-                                ⬇️ Download ({chosen_q})
-                            </button>
-                        </a>
-                    ''', unsafe_allow_html=True)
+                    # 🟢 Native Streamlit Direct Download Button (No external redirect)
+                    ext = "mp3" if "Audio Only" in chosen_q else "mp4"
+                    mime_type = "audio/mp3" if "Audio Only" in chosen_q else "video/mp4"
+                    
+                    st.download_button(
+                        label=f"⬇️ Direct Download ({chosen_q})",
+                        data=file_bytes,
+                        file_name=f"{title}.{ext}",
+                        mime=mime_type,
+                        use_container_width=True
+                    )
                 else:
-                    st.error("নির্বাচিত কোয়ালিটির লিঙ্ক এক্সট্র্যাক্ট করা সম্ভব হয়নি। অন্য কোয়ালিটি দিয়ে চেষ্টা করুন।")
+                    st.error("ফাইল তৈরি করতে সমস্যা হয়েছে। অন্য একটি কোয়ালিটি চেষ্টা করুন।")
 
         except Exception as e:
             st.error(f"প্রসেস করতে সমস্যা হয়েছে: {str(e)}")

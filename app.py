@@ -1,7 +1,9 @@
 import streamlit as st
-import requests
+import yt_dlp
+import os
+import tempfile
 
-# ১. পেজ কনফিগারেশন
+# ১. পেজ সেটআপ
 st.set_page_config(
     page_title="SILENT Universal Downloader",
     page_icon="🎬",
@@ -9,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম সেটআপ ও CSS
+# ২. থিম সেটআপ
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
 if theme_choice == "Dark Animated":
@@ -130,54 +132,24 @@ else:
     </style>
     """, unsafe_allow_html=True)
 
-# ৩. ল্যাঙ্গুয়েজ অপশন
-TEXTS = {
-    "bn": {
-        "title": "🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার",
-        "subtitle": "যেকোনো ওয়েবসাইটের লিঙ্ক পেস্ট করে আপনার পছন্দের কোয়ালিটিতে ভিডিও বা অডিও নামিয়ে নিন।",
-        "url_label": "ভিডিও লিঙ্কটি এখানে দিন:",
-        "url_placeholder": "https://www.youtube.com/watch?v=...",
-        "fetch_btn": "ভিডিও প্রসেস করুন 🔍",
-        "select_format": "রেজোলিউশন / কোয়ালিটি বাছাই করুন:",
-        "err_empty": "দয়া করে একটি সঠিক লিঙ্ক দিন।"
-    },
-    "en": {
-        "title": "🎬 All-in-One Super Downloader",
-        "subtitle": "Paste any video link and download in your preferred resolution easily.",
-        "url_label": "Enter Video Link Here:",
-        "url_placeholder": "https://www.youtube.com/watch?v=...",
-        "fetch_btn": "Process Video 🔍",
-        "select_format": "Select Resolution / Quality:",
-        "err_empty": "Please enter a valid video link."
-    }
-}
-
-col1, col2 = st.columns([3, 1])
-with col2:
-    lang = st.selectbox("🌐 Language", ["বাংলা", "English"])
-    lang_code = "bn" if lang == "বাংলা" else "en"
-
-t = TEXTS[lang_code]
-
-st.title(t["title"])
+st.title("🎬 অল-ইন-ওয়ান সুপার ডাউনলোডার")
 st.markdown('<div class="builder-name">✨ Made by SILENT ✨</div>', unsafe_allow_html=True)
-st.write(t["subtitle"])
 
-url_input = st.text_input(t["url_label"], placeholder=t["url_placeholder"])
+url_input = st.text_input("ভিডিও লিঙ্কটি এখানে দিন:", placeholder="https://www.youtube.com/watch?v=...")
 
 quality_options = [
-    "1080p Full HD",
-    "720p HD",
-    "480p SD",
-    "360p Low",
+    "1080p Full HD (MP4)",
+    "720p HD (MP4)",
+    "480p SD (MP4)",
+    "360p Low (MP4)",
     "Audio Only (MP3)"
 ]
 
-selected_quality = st.selectbox(t["select_format"], quality_options)
+selected_quality = st.selectbox("রেজোলিউশন / কোয়ালিটি বাছাই করুন:", quality_options)
 
-if st.button(t["fetch_btn"]):
+if st.button("ভিডিও প্রসেস করুন 🔍"):
     if not url_input.strip():
-        st.warning(t["err_empty"])
+        st.warning("দয়া করে একটি সঠিক লিঙ্ক দিন।")
     else:
         st.session_state["target_url"] = url_input.strip()
         st.session_state["selected_q"] = selected_quality
@@ -191,63 +163,72 @@ if "target_url" in st.session_state and url_input.strip():
     st.markdown("""
     <div class="cat-container">
         <div class="cute-cat">🐱🐾 🧶</div>
-        <div class="playing-text">ক্যাট আপনার ভিডিও লিঙ্ক প্রস্তুত করেছে! নিচে ডাইরেক্ট ডাউনলোড করুন ✨</div>
+        <div class="playing-text">ক্যাট আপনার ভিডিও প্রসেস করছে... ফাইল প্রস্তুত করা হচ্ছে! ✨</div>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.spinner("লিঙ্ক প্রসেস করা হচ্ছে..."):
+    with st.spinner("ভিডিও ডাউনলোড এবং প্রসেস করা হচ্ছে..."):
         try:
-            # Cobalt API Payload Setup
-            quality_map = {
-                "1080p Full HD": "1080",
-                "720p HD": "720",
-                "480p SD": "480",
-                "360p Low": "360"
-            }
-            
-            payload = {"url": clean_url}
-            
-            if "Audio Only" in chosen_q:
-                payload["downloadMode"] = "audio"
-                payload["audioFormat"] = "mp3"
+            temp_dir = tempfile.gettempdir()
+            out_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
+
+            if "1080p" in chosen_q:
+                fmt = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best'
+            elif "720p" in chosen_q:
+                fmt = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best'
+            elif "480p" in chosen_q:
+                fmt = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best'
+            elif "360p" in chosen_q:
+                fmt = 'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]/best'
+            elif "Audio Only" in chosen_q:
+                fmt = 'bestaudio/best'
             else:
-                payload["videoQuality"] = quality_map.get(chosen_q, "720")
+                fmt = 'best'
 
-            headers = {
-                "Accept": "application/json",
-                "Content-Type": "application/json"
+            ydl_opts = {
+                'format': fmt,
+                'outtmpl': out_template,
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,
             }
 
-            res = requests.post("https://api.cobalt.tools/api/json", json=payload, headers=headers, timeout=15)
-            data = res.json()
+            # কুকি ফাইল উপস্থিত থাকলে অটোমেটিক ব্যবহার করবে
+            if os.path.exists("cookies.txt"):
+                ydl_opts['cookiefile'] = "cookies.txt"
 
-            if "url" in data:
-                download_link = data["url"]
-                st.success("🎉 ফাইল প্রসেস সম্পন্ন হয়েছে!")
-                
-                # Direct High-Speed Download Button
-                st.markdown(f'''
-                    <a href="{download_link}" target="_blank" style="text-decoration: none;">
-                        <button style="
-                            width: 100%;
-                            background-color: #28a745;
-                            color: white;
-                            font-weight: bold;
-                            border-radius: 10px;
-                            border: none;
-                            padding: 16px;
-                            font-size: 18px;
-                            cursor: pointer;
-                            margin-top: 10px;">
-                            ⬇️ Direct Download ({chosen_q})
-                        </button>
-                    </a>
-                ''', unsafe_allow_html=True)
-            else:
-                st.error("লিঙ্কটি প্রসেস করতে ব্যর্থ হয়েছে। প্ল্যাটফর্মের কোনো প্রাইভেট ভিডিও বা ভুল লিঙ্ক কিনা চেক করুন।")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(clean_url, download=True)
+                file_path = ydl.prepare_filename(info)
+                title = info.get('title', 'video')
+
+                if os.path.exists(file_path):
+                    with open(file_path, "rb") as file_data:
+                        file_bytes = file_data.read()
+                        
+                    st.success(f"🎬 **শিরোনাম:** {title}")
+                    
+                    ext = "mp3" if "Audio Only" in chosen_q else "mp4"
+                    mime_type = "audio/mp3" if "Audio Only" in chosen_q else "video/mp4"
+                    
+                    st.download_button(
+                        label=f"⬇️ Direct Download ({chosen_q})",
+                        data=file_bytes,
+                        file_name=f"{title}.{ext}",
+                        mime=mime_type,
+                        use_container_width=True
+                    )
+                    
+                    # প্রসেস শেষে টেম্প ফাইল ডিলিট
+                    try:
+                        os.remove(file_path)
+                    except Exception:
+                        pass
+                else:
+                    st.error("ফাইল তৈরি করতে সমস্যা হয়েছে। অন্য একটি কোয়ালিটি চেষ্টা করুন।")
 
         except Exception as e:
-            st.error(f"সার্ভারে কানেক্ট করতে সমস্যা হয়েছে: {str(e)}")
+            st.error(f"প্রসেস করতে সমস্যা হয়েছে: {str(e)}")
 
 st.markdown("---")
 st.markdown('<p style="text-align: center;">SILENT Universal Downloader | Mobile & Desktop Supported</p>', unsafe_allow_html=True)

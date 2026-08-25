@@ -145,15 +145,11 @@ if 'video_info' not in st.session_state:
 if 'video_url' not in st.session_state:
     st.session_state.video_url = ""
 
+# 🟢 ফিক্সড গ্লোবাল অপশন (সব রেজোলিউশন আনলক করতে)
 COMMON_YDL_OPTS = {
     'quiet': True,
     'nocheckcertificate': True,
-    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web']
-        }
-    }
+    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
 }
 
 if st.button(t["fetch_btn"]):
@@ -183,20 +179,21 @@ if st.session_state.video_info and st.session_state.video_url == url:
     formats = info.get('formats', [])
     options = {"Audio Only (MP3)": "bestaudio/best"}
     
-    # 🎯 আপডেট করা রেজোলিউশন ডিটেকশন লজিক
+    # 🟢 সব ধরনের ভিডিও ফরম্যাটের হাইট ডিটেক্ট করার নতুন লজিক
     heights = set()
     for f in formats:
         h = f.get('height')
         ext = f.get('ext', '')
-        vcodec = f.get('vcodec', 'none')
-        # mhtml এবং ভিডিও-বিহীন ফরম্যাট বাদ দিয়ে রেজোলিউশন হাইট বের করা
-        if h and ext != 'mhtml' and vcodec != 'none':
-            heights.add(h)
+        # mhtml বাদ দিয়ে যেকোনো বৈধ ভিডিও হাইট সংগ্রহ করা
+        if h and ext != 'mhtml':
+            heights.add(int(h))
 
-    # রেজোলিউশন ছোট থেকে বড় অনুযায়ী সাজানো (যেমন: 144p, 360p, 480p, 720p, 1080p)
-    for h in sorted(list(heights), reverse=True):
-        res_str = f"{h}p (mp4)"
-        options[res_str] = f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
+    if heights:
+        for h in sorted(list(heights), reverse=True):
+            res_str = f"{h}p (mp4)"
+            options[res_str] = f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
+    else:
+        options["Best Available Quality"] = "bestvideo+bestaudio/best"
 
     selected_res = st.selectbox(t["select_format"], list(options.keys()))
 

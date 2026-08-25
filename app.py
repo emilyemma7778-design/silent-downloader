@@ -180,15 +180,15 @@ if "target_url" in st.session_state and url_input.strip():
             temp_dir = tempfile.gettempdir()
             out_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-            # ফরম্যাট নির্বাচন
+            # 🔥 নমনীয় (Flexible) ও ফলব্যাক যুক্ত ফরম্যাট সিলেক্টর
             if "1080p" in chosen_q:
-                fmt = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best'
+                fmt = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'
             elif "720p" in chosen_q:
-                fmt = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best'
+                fmt = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
             elif "480p" in chosen_q:
-                fmt = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best'
+                fmt = 'bestvideo[height<=480]+bestaudio/best[height<=480]/best'
             elif "360p" in chosen_q:
-                fmt = 'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]/best'
+                fmt = 'bestvideo[height<=360]+bestaudio/best[height<=360]/best'
             elif "Audio Only" in chosen_q:
                 fmt = 'bestaudio/best'
             else:
@@ -200,7 +200,7 @@ if "target_url" in st.session_state and url_input.strip():
                 'quiet': True,
                 'no_warnings': True,
                 'nocheckcertificate': True,
-                # 🔥 YouTube Security Bypass Options
+                # 🔥 ইউটিউব সেন্সরশিপ ও নিরাপত্তা বাইপাস
                 'extractor_args': {
                     'youtube': {
                         'player_client': ['android', 'web'],
@@ -209,7 +209,7 @@ if "target_url" in st.session_state and url_input.strip():
                 }
             }
 
-            # Secrets থেকে তৈরি কুকি ফাইল থাকলে তা যুক্ত করা
+            # Secrets থেকে কুকি ফাইল যুক্ত করা (যদি থাকে)
             if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
                 ydl_opts['cookiefile'] = COOKIE_FILE_PATH
 
@@ -244,7 +244,7 @@ if "target_url" in st.session_state and url_input.strip():
                     st.error("ফাইল তৈরি করতে সমস্যা হয়েছে। অন্য একটি কোয়ালিটি চেষ্টা করুন।")
 
         except Exception as e:
-            st.error(f"প্রসেস করতে সমস্যা হয়েছে: {str(e)}")
+            st.error(f"প্রসেস করতে समस्या হয়েছে: {str(e)}")
 
 st.markdown("---")
 st.markdown('<p style="text-align: center;">SILENT Universal Downloader | Mobile & Desktop Supported</p>', unsafe_allow_html=True)

@@ -202,7 +202,6 @@ if "target_url" in st.session_state and url_input.strip():
             temp_dir = tempfile.gettempdir()
             out_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-            # Single-file Progressive Formats Prefer করা হচ্ছে (যা ffmpeg ছাড়াও মার্জিং ছাড়াই কাজ করে)
             if "1080p" in chosen_q:
                 fmt = 'best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best'
             elif "720p" in chosen_q:
@@ -216,13 +215,24 @@ if "target_url" in st.session_state and url_input.strip():
             else:
                 fmt = 'best'
 
+            # 480/403 Error Bypass Configuration
             ydl_opts = {
                 'format': fmt,
                 'outtmpl': out_template,
                 'quiet': True,
                 'no_warnings': True,
                 'nocheckcertificate': True,
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web', 'ios'],
+                        'skip': ['hls']
+                    }
+                },
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                }
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

@@ -1,5 +1,6 @@
 import streamlit as st
-import json
+import requests
+import re
 
 # ১. পেজ সেটআপ
 st.set_page_config(
@@ -9,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. ডাইনামিক থিম CSS
+# ২. থিম CSS
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
 if theme_choice == "Dark Animated":
@@ -64,6 +65,26 @@ else:
 
 st.markdown(theme_css, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+.stButton>button {
+    width: 100%;
+    background-color: #ff4b4b;
+    color: white;
+    font-weight: bold;
+    border-radius: 10px;
+    border: none;
+    padding: 12px 20px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+.stButton>button:hover {
+    background-color: #ff6b6b;
+    transform: translateY(-2px);
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ৩. ল্যাঙ্গুয়েজ টেক্সট
 TEXTS = {
     "bn": {
@@ -71,18 +92,24 @@ TEXTS = {
         "subtitle": "যেকোনো ওয়েবসাইটের লিঙ্ক পেস্ট করে আপনার পছন্দের কোয়ালিটিতে ভিডিও নামিয়ে নিন।",
         "url_label": "ভিডিও লিঙ্কটি এখানে দিন:",
         "url_placeholder": "https://www.youtube.com/watch?v=...",
+        "fetch_btn": "ভিডিও প্রসেস করুন 🔍",
+        "fetching": "ভিডিওর লিঙ্ক প্রসেস করা হচ্ছে...",
         "select_format": "রেজোলিউশন / কোয়ালিটি বাছাই করুন:",
         "download_start": "ডাউনলোড লিঙ্ক তৈরি করুন ⬇️",
-        "err_empty": "দয়া করে একটি সঠিক লিঙ্ক দিন।"
+        "err_empty": "দয়া করে একটি সঠিক লিঙ্ক দিন।",
+        "err_fetch": "ভিডিও স্ট্রিম লিঙ্ক এক্সট্র্যাক্ট করা সম্ভব হয়নি।"
     },
     "en": {
         "title": "🎬 All-in-One Super Downloader",
         "subtitle": "Paste any video link and download in your preferred resolution easily.",
         "url_label": "Enter Video Link Here:",
         "url_placeholder": "https://www.youtube.com/watch?v=...",
+        "fetch_btn": "Process Video 🔍",
+        "fetching": "Processing video link...",
         "select_format": "Select Resolution / Quality:",
         "download_start": "Generate Download Link ⬇️",
-        "err_empty": "Please enter a valid video link."
+        "err_empty": "Please enter a valid video link.",
+        "err_fetch": "Failed to extract video stream link."
     }
 }
 
@@ -99,99 +126,100 @@ st.write(t["subtitle"])
 
 url_input = st.text_input(t["url_label"], placeholder=t["url_placeholder"])
 
-quality_options = {
-    "1080p Full HD (MP4)": "1080",
-    "720p HD (MP4)": "720",
-    "480p SD (MP4)": "480",
-    "360p Low (MP4)": "360",
-    "Audio Only (MP3)": "audio"
-}
+def extract_youtube_id(url):
+    regex = r"(?:v=|\/([0-9A-Za-z_-]{11})|youtu\.be\/|\/embed\/|\/v\/|\/e\/|watch\?v=|\?v=)([^#\&\?]*)"
+    match = re.search(regex, url)
+    if match:
+        return match.group(1) if match.group(1) else match.group(2)
+    return None
 
-selected_option = st.selectbox(t["select_format"], list(quality_options.keys()))
+def get_piped_streams(video_id):
+    instances = [
+        "https://pipedapi.kavin.rocks",
+        "https://api.piped.private.coffee",
+        "https://piped-api.garudalinux.org"
+    ]
+    for instance in instances:
+        try:
+            res = requests.get(f"{instance}/streams/{video_id}", timeout=5)
+            if res.status_code == 200:
+                return res.json()
+        except Exception:
+            continue
+    return None
 
-if st.button(t["download_start"]):
+if st.button(t["fetch_btn"]):
     if not url_input.strip():
         st.warning(t["err_empty"])
     else:
-        quality_val = quality_options[selected_option]
-        is_audio = "true" if quality_val == "audio" else "false"
-        v_quality = "1080" if quality_val == "audio" else quality_val
+        v_id = extract_youtube_id(url_input.strip())
+        if v_id:
+            with st.spinner(t["fetching"]):
+                data = get_piped_streams(v_id)
+                if data:
+                    st.session_state["stream_data"] = data
+                    st.session_state["active_url"] = url_input.strip()
+                else:
+                    st.error(t["err_fetch"])
+        else:
+            st.error(t["err_empty"])
 
-        # ক্লায়েন্ট-সাইড প্রসেসিং Script (JavaScript Engine)
-        js_code = f"""
-        <div id="status-box" style="padding:15px; border-radius:10px; background:#1e293b; color:#fff; font-family:sans-serif; text-align:center;">
-            ⏳ প্রসেসিং শুরু হচ্ছে...
-        </div>
-        
-        <script>
-        (async function() {{
-            const statusBox = document.getElementById("status-box");
-            const targetUrl = "{url_input.strip()}";
-            const quality = "{v_quality}";
-            const isAudio = {is_audio};
-            
-            // Multiple Public Engine Nodes
-            const instances = [
-                "https://co.wuk.sh/api/json",
-                "https://cobalt.stream/api/json",
-                "https://api.cobalt.tools/"
-            ];
+if "stream_data" in st.session_state and st.session_state.get("active_url") == url_input.strip():
+    data = st.session_state["stream_data"]
+    title = data.get("title", "YouTube Video")
+    
+    st.markdown("---")
+    st.subheader(f"📹 {title}")
+    
+    video_streams = data.get("videoStreams", [])
+    audio_streams = data.get("audioStreams", [])
+    
+    options = {}
+    
+    # MP4 সোর্স ফিল্টার
+    for s in video_streams:
+        if s.get("format") == "MPEG_4" or s.get("mimeType") == "video/mp4":
+            quality = s.get("quality", "Video")
+            url = s.get("url")
+            if url and quality not in options:
+                options[f"{quality} (MP4)"] = url
+                
+    for a in audio_streams:
+        if "audio/mp4" in a.get("mimeType", "") or "audio/webm" in a.get("mimeType", ""):
+            url = a.get("url")
+            if url:
+                options["Audio Only (MP3/M4A)"] = url
+                break
 
-            let success = false;
+    if not options:
+        # Fallback to direct streams
+        for s in video_streams:
+            quality = s.get("quality", "Video")
+            url = s.get("url")
+            if url:
+                options[f"{quality}"] = url
 
-            for (let endpoint of instances) {{
-                try {{
-                    statusBox.innerHTML = "🔄 ক্লায়েন্ট বাইপাস চলছে... (" + new URL(endpoint).hostname + ")";
-                    
-                    let bodyData = {{
-                        url: targetUrl,
-                        videoQuality: quality,
-                        downloadMode: isAudio ? "audio" : "auto"
-                    }};
-
-                    let res = await fetch(endpoint, {{
-                        method: "POST",
-                        headers: {{
-                            "Accept": "application/json",
-                            "Content-Type": "application/json"
-                        }},
-                        body: JSON.stringify(bodyData)
-                    }});
-
-                    let data = await res.json();
-
-                    if (data.url || (data.picker && data.picker.length > 0)) {{
-                        let finalUrl = data.url || data.picker[0].url;
-                        statusBox.innerHTML = `
-                            <p style="color:#4ade80; font-size:18px; font-weight:bold;">🎉 ভিডিও ডাউনলোডের জন্য প্রস্তুত!</p>
-                            <a href="${{finalUrl}}" target="_blank" style="text-decoration:none;">
-                                <button style="width:100%; background:#22c55e; color:white; font-size:18px; font-weight:bold; padding:14px; border:none; border-radius:10px; cursor:pointer;">
-                                    💾 ফাইলটি ডাউনলোড করুন (Click to Save)
-                                </button>
-                            </a>
-                        `;
-                        success = true;
-                        break;
-                    }}
-                }} catch (e) {{
-                    console.log("Failed node:", endpoint);
-                }}
-            }}
-
-            if (!success) {{
-                statusBox.innerHTML = `
-                    <p style="color:#ef4444; font-size:16px;">⚠️ সরাসরি স্ট্রিম লিংক তৈরি করা সম্ভব হয়নি। নিচের ইমার্জেন্সি ডাউনলোডার ব্যবহার করুন:</p>
-                    <a href="https://cobalt.tools/?url=${{encodeURIComponent(targetUrl)}}" target="_blank" style="text-decoration:none;">
-                        <button style="width:100%; background:#eab308; color:black; font-size:16px; font-weight:bold; padding:12px; border:none; border-radius:10px; cursor:pointer;">
-                            ⚡ Emergency Direct Portal Open করুন
-                        </button>
-                    </a>
-                `;
-            }}
-        }})();
-        </script>
-        """
-        st.components.v1.html(js_code, height=180)
+    selected_label = st.selectbox(t["select_format"], list(options.keys()))
+    
+    if selected_label:
+        dl_url = options[selected_label]
+        st.markdown(f'''
+            <a href="{dl_url}" target="_blank" download style="text-decoration: none;">
+                <button style="
+                    width: 100%;
+                    background-color: #28a745;
+                    color: white;
+                    font-weight: bold;
+                    border-radius: 10px;
+                    border: none;
+                    padding: 14px 20px;
+                    font-size: 18px;
+                    cursor: pointer;
+                    margin-top: 15px;">
+                    💾 ফাইলটি ডাউনলোড করুন (Direct Link)
+                </button>
+            </a>
+        ''', unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown('<p style="text-align: center;">SILENT Universal Downloader | Mobile & Desktop Supported</p>', unsafe_allow_html=True)

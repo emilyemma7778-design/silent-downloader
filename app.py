@@ -3,7 +3,7 @@ import yt_dlp
 import os
 import glob
 
-# ১. পেজ কনফিগারেশন
+# ১. পেজ কনফিগারেশন (মোবাইল ও ডেসকটপ রেসপন্সিভ)
 st.set_page_config(
     page_title="SILENT Universal Downloader",
     page_icon="🎬",
@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ২. থিম ও কালার সিলেক্টর
+# ২. থিম ও কালার সিলেক্টর (Dark Animation / Light Mode)
 theme_choice = st.radio("🎨 Theme / থিম সিলেক্ট করুন:", ["Dark Animated", "Light Clean"], horizontal=True)
 
 if theme_choice == "Dark Animated":
@@ -184,11 +184,13 @@ if st.session_state.video_info and st.session_state.video_url == url:
     formats = info.get('formats', [])
     options = {"Audio Only (MP3)": "bestaudio/best"}
     
-    # সব রেজোলিউশন (1080p, 720p, 480p ইত্যাদি) ফিল্টার
+    # 🟢 ফিক্সড রেজোলিউশন লজিক: mhtml এবং ফালতু স্ন্যাপশট ফরম্যাট ফিল্টার করা
     for f in formats:
         height = f.get('height')
-        ext = f.get('ext', 'mp4')
-        if height:
+        ext = f.get('ext', '')
+        vcodec = f.get('vcodec', 'none')
+        
+        if height and ext != 'mhtml' and vcodec != 'none':
             res_str = f"{height}p ({ext})"
             if res_str not in options:
                 options[res_str] = f"bestvideo[height={height}]+bestaudio/best[height={height}]/best"
@@ -198,7 +200,7 @@ if st.session_state.video_info and st.session_state.video_url == url:
     if st.button(t["download_start"]):
         with st.spinner(t["downloading"]):
             try:
-                # পুরনো টেম্পোরারি ফাইল মোছা
+                # পুরনো টেম্পোরারি ফাইল রিমুভ
                 for old_file in glob.glob("dl_file*"):
                     try:
                         os.remove(old_file)
